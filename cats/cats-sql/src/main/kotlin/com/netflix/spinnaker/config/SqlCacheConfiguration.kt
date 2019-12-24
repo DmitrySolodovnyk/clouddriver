@@ -11,11 +11,14 @@ import com.netflix.spinnaker.cats.cluster.DefaultNodeStatusProvider
 import com.netflix.spinnaker.cats.cluster.NodeStatusProvider
 import com.netflix.spinnaker.cats.module.CatsModule
 import com.netflix.spinnaker.cats.provider.Provider
+import com.netflix.spinnaker.cats.provider.ProviderRegistry
 import com.netflix.spinnaker.cats.sql.SqlProviderRegistry
 import com.netflix.spinnaker.cats.sql.cache.SpectatorSqlCacheMetrics
+import com.netflix.spinnaker.cats.sql.cache.SqlCacheCleanupAgent
 import com.netflix.spinnaker.cats.sql.cache.SqlCacheMetrics
 import com.netflix.spinnaker.cats.sql.cache.SqlCleanupStaleOnDemandCachesAgent
 import com.netflix.spinnaker.cats.sql.cache.SqlNamedCacheFactory
+import com.netflix.spinnaker.cats.sql.cache.SqlNames
 import com.netflix.spinnaker.cats.sql.cache.SqlTableMetricsAgent
 import com.netflix.spinnaker.clouddriver.cache.CustomSchedulableAgentIntervalProvider
 import com.netflix.spinnaker.clouddriver.cache.EurekaStatusNodeStatusProvider
@@ -37,7 +40,6 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.ComponentScan
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
-import java.lang.IllegalArgumentException
 import java.time.Clock
 import java.time.Duration
 import java.util.Optional
@@ -160,6 +162,17 @@ class SqlCacheConfiguration {
     clock: Clock
   ): SqlCleanupStaleOnDemandCachesAgent =
     SqlCleanupStaleOnDemandCachesAgent(applicationContext, registry, clock)
+
+  @Bean
+  @ConditionalOnExpression("\${sql.read-only:false} == false and \${sql.cache-cleanup-agent.enabled:false}")
+  fun sqlCacheCleanupAgent(
+    providerRegistry: ProviderRegistry,
+    jooq: DSLContext,
+    registry: Registry,
+    sqlConstraints: SqlConstraints,
+    @Value("\${sql.table-namespace:#{null}}") tableNamespace: String?
+  ): SqlCacheCleanupAgent =
+    SqlCacheCleanupAgent(providerRegistry, jooq, registry, SqlNames(tableNamespace, sqlConstraints))
 
   @Bean
   @ConditionalOnExpression("\${sql.read-only:false} == false")
